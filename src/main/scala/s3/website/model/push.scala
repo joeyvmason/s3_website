@@ -62,9 +62,14 @@ case class Upload(originalFile: File, uploadType: UploadType)(implicit site: Sit
       if (fileIsGzippedByExternalBuildTool) {
         val unzippedFile = createTempFile("unzipped", originalFile.getName)
         unzippedFile.deleteOnExit()
-        using(new GZIPInputStream(fis(originalFile))) { stream =>
-          IOUtils.copy(stream, new FileOutputStream(unzippedFile))
+        using (fis(originalFile)) { fileInputStream =>
+          using(new GZIPInputStream(fileInputStream)) { inputStream =>
+            using(new FileOutputStream(unzippedFile)) { outputStream =>
+              IOUtils.copy(inputStream, outputStream)
+            }
+          }
         }
+
         unzippedFile
       } else {
         originalFile
@@ -113,9 +118,15 @@ case class Upload(originalFile: File, uploadType: UploadType)(implicit site: Sit
           logger.debug(s"Gzipping file ${originalFile.getName}")
           val tempFile = createTempFile(originalFile.getName, "gzip")
           tempFile.deleteOnExit()
-          using(new GZIPOutputStream(new FileOutputStream(tempFile))) { stream =>
-            IOUtils.copy(fis(originalFile), stream)
+
+          using(new FileOutputStream(tempFile)) { fileOutputStream =>
+            using(new GZIPOutputStream(fileOutputStream)) { stream =>
+              using (fis(originalFile)) { fileInputStream =>
+                IOUtils.copy(fileInputStream, stream)
+              }
+            }
           }
+
           tempFile
         }
       }
